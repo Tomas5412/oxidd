@@ -744,6 +744,7 @@ pub fn derive_pseudo_boolean_function(input: syn::DeriveInput) -> TokenStream {
         &[
             Var("var"),
             Binary("restrict"),
+            Binary("project"),
             Binary("add"),
             Binary("sub"),
             Binary("mul"),

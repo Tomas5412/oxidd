@@ -1438,6 +1438,27 @@ pub trait PseudoBooleanFunction: Function {
         })
     }
 
+    /// Projects a set of variables
+    ///
+    /// `vars` conceptually is a partial assignment, represented as the
+    /// conjunction of positive or negative literals.
+    ///
+    /// However, the assignment is never used, 
+    /// as the behaviour of the function doesn't matter.
+    ///
+    /// For each node in vars, it merges both branches by adding them, 
+    /// making it no longer depend on that variable.
+    /// 
+    /// Locking behavior: acquires the manager's lock for shared access. //TODO: Does it, really?
+    ///
+    /// Panics if `self` and `vars` don't belong to the same manager.
+    fn project(&self, vars: &Self) -> AllocResult<Self> {
+        self.with_manager_shared(|manager, root| {
+            let e = Self::project_edge(manager, root, vars.as_edge(manager))?;
+            Ok(Self::from_edge(manager, e))
+        })
+    }
+
     /// Point-wise addition `self + rhs`
     ///
     /// Locking behavior: acquires a shared manager lock
@@ -1554,6 +1575,14 @@ pub trait PseudoBooleanFunction: Function {
     /// Edge version of [`Self::restrict()`]
     #[must_use]
     fn restrict_edge<'id>(
+        manager: &Self::Manager<'id>,
+        root: &EdgeOfFunc<'id, Self>,
+        vars: &EdgeOfFunc<'id, Self>,
+    ) -> AllocResult<EdgeOfFunc<'id, Self>>;
+
+    /// Edge version of [`Self::project()`]
+    #[must_use]
+    fn project_edge<'id>(
         manager: &Self::Manager<'id>,
         root: &EdgeOfFunc<'id, Self>,
         vars: &EdgeOfFunc<'id, Self>,

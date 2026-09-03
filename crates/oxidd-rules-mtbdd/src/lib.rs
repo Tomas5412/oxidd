@@ -91,6 +91,9 @@ pub enum MTBDDOp {
 
     /// Restrict a set of variables to constant values
     Restrict,
+
+    /// Project a set of variables
+    Project,
 }
 
 /// Collect the two children of a binary node

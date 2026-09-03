@@ -227,6 +227,99 @@ where
     }
 }
 
+/// Project a set of variables 'vars' (a conjunction of literals)
+/// on f by merging all branches of vars
+fn project<M, T>(
+    manager: &M,
+    f: Borrowed<M::Edge>,
+    vars: Borrowed<M::Edge>,
+) -> AllocResult<M::Edge>
+where
+    M: Manager<Terminal = T> + HasApplyCache<M, MTBDDOp>,
+    M::InnerNode: HasLevel,
+    T: NumberBase,
+{
+    stat!(call MTBDDOp::Restrict);
+    
+
+    let Node::Inner(vnode) = manager.get_node(&vars) else {
+        return Ok(manager.clone_edge(&f));
+    };
+
+    /// Get the next iteration of a conjunction of literals.
+    #[inline]
+    fn pick_next<'a, M, T>(
+        manager: &'a M, 
+        vnode: &'a M::InnerNode
+    ) -> Borrowed<'a, M::Edge>
+    where
+        M: Manager<Terminal = T>,
+        T: NumberBase,
+    {
+        let vt = vnode.child(0);
+        match manager.get_node(&vt) {
+            Node::Inner(_) => vt,
+            Node::Terminal(t) if t.borrow().is_one() => vt,
+            _ => vnode.child(1),
+        }
+    }
+
+
+    let fnode = match manager.get_node(&f) {
+        Node::Inner(n) => n,
+        Node::Terminal(_) => {
+            // double the result
+            let next = pick_next(manager, vnode);
+            let p = EdgeDropGuard::new(manager, project::<_, T>(manager, f.borrowed(), next)?);
+            return apply_bin::<_, T, {MTBDDOp::Add as u8}>(manager, p.borrowed(), p.borrowed());
+        }
+    };
+
+    let flevel = fnode.level();
+    let vlevel = vnode.level();
+
+    if vlevel < flevel {
+        let next = pick_next(manager, vnode);
+        let p = EdgeDropGuard::new(manager, project::<_, T>(manager, f.borrowed(), next)?);
+        return apply_bin::<_, T, {MTBDDOp::Add as u8}>(manager, p.borrowed(), p.borrowed());
+    }
+
+    // Query apply cache.
+    stat!(cache_query MTBDDOp::Project);
+    if let Some(res) =
+        manager
+            .apply_cache()
+            .get(manager, MTBDDOp::Project, &[f.borrowed(), vars.borrowed()])
+    {
+        stat!(cache_hit MTBDDOp::Project);
+        return Ok(res);
+    }
+
+    let res = if vlevel > flevel {
+        let (ft, fe) = collect_children(fnode);
+        let t = EdgeDropGuard::new(manager, project::<_, T>(manager, ft, vars.borrowed())?);
+        let e = EdgeDropGuard::new(manager, project::<_, T>(manager, fe, vars.borrowed())?);
+        reduce(manager, 
+            flevel, 
+            t.into_edge(), 
+            e.into_edge(), 
+            MTBDDOp::Project)?
+    } else {
+        let (ft, fe) = collect_children(fnode);
+        let next = pick_next(manager, vnode);
+        let p1 = EdgeDropGuard::new(manager, project::<_, T>(manager, ft, next.borrowed())?);
+        let p0 = EdgeDropGuard::new(manager, project::<_, T>(manager, fe, next.borrowed())?);
+        apply_bin::<_, T, {MTBDDOp::Add as u8}>(manager, p1.borrowed(), p0.borrowed())?
+    };
+
+    manager
+        .apply_cache()
+        .add(manager, MTBDDOp::Project, &[f.borrowed(), vars.borrowed()], res.borrowed());
+
+    Ok(res)
+}
+
+
 /// Recursively apply the if-then-else operator (`if f { g } else { h }`)
 ///
 /// `f` must be a 0-1-valued MTBDD (see [`PseudoBooleanFunction::ite_edge`]).
@@ -431,6 +524,15 @@ where
         vars: &EdgeOfFunc<'id, Self>,
     ) -> AllocResult<EdgeOfFunc<'id, Self>> {
         restrict::<_, T>(manager, root.borrowed(), vars.borrowed())
+    }
+
+    #[inline]
+    fn project_edge<'id>(
+        manager: &Self::Manager<'id>,
+        root: &EdgeOfFunc<'id, Self>,
+        vars: &EdgeOfFunc<'id, Self>,
+    ) -> AllocResult<EdgeOfFunc<'id, Self>> {
+        project::<_, T>(manager, root.borrowed(), vars.borrowed())
     }
 
     #[inline]
