@@ -247,6 +247,10 @@ where
     };
 
     /// Get the next iteration of a conjunction of literals.
+    /// This is done because project's 'vars' parameter is the same one as restrict. So to get the next iteration a couple of things must be checked.
+    /// This is defined inside of the function because I didn't want to bloat the file with functions other than the basic ones.
+    /// This multiple definition could be a huge waste of memory. 
+    // Best case, 'project' should be modified such that we don't need to care for definitions the function does not use.
     #[inline]
     fn pick_next<'a, M, T>(
         manager: &'a M, 
@@ -268,7 +272,7 @@ where
     let fnode = match manager.get_node(&f) {
         Node::Inner(n) => n,
         Node::Terminal(_) => {
-            // double the result
+            // f is terminal; double the result
             let next = pick_next(manager, vnode);
             let p = EdgeDropGuard::new(manager, project::<_, T>(manager, f.borrowed(), next)?);
             return apply_bin::<_, T, {MTBDDOp::Add as u8}>(manager, p.borrowed(), p.borrowed());
@@ -279,6 +283,7 @@ where
     let vlevel = vnode.level();
 
     if vlevel < flevel {
+        // f above vars; select the next iteration 
         let next = pick_next(manager, vnode);
         let p = EdgeDropGuard::new(manager, project::<_, T>(manager, f.borrowed(), next)?);
         return apply_bin::<_, T, {MTBDDOp::Add as u8}>(manager, p.borrowed(), p.borrowed());
@@ -296,6 +301,7 @@ where
     }
 
     let res = if vlevel > flevel {
+        // vars above f; continue normally
         let (ft, fe) = collect_children(fnode);
         let t = EdgeDropGuard::new(manager, project::<_, T>(manager, ft, vars.borrowed())?);
         let e = EdgeDropGuard::new(manager, project::<_, T>(manager, fe, vars.borrowed())?);
@@ -305,6 +311,7 @@ where
             e.into_edge(), 
             MTBDDOp::Project)?
     } else {
+        // top var at the level of f; add both branches, and continue.
         let (ft, fe) = collect_children(fnode);
         let next = pick_next(manager, vnode);
         let p1 = EdgeDropGuard::new(manager, project::<_, T>(manager, ft, next.borrowed())?);
