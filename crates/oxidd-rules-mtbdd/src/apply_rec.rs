@@ -587,6 +587,23 @@ where
 
         inner(manager, edge.borrowed(), &choices)
     }
+
+    fn wmc_edge<'id>(
+        manager: &Self::Manager<'id>,
+        edge: &EdgeOfFunc<'id, Self>,
+        weight: &EdgeOfFunc<'id, Self>
+    ) -> T {
+        let prod = apply_bin::<_, T, {MTBDDOp::Mul as u8}>(manager, edge.borrowed(), weight.borrowed()).expect("Out of memory");
+        let prod = EdgeDropGuard::new(manager,prod);
+
+        let proj = project::<_,T>(manager, prod.borrowed(), prod.borrowed()).expect("Out of memory");
+        let proj = EdgeDropGuard::new(manager,proj);
+
+        let Node::Terminal(t) = manager.get_node(&proj) else {
+            panic!("Projection did not fully reduce the result to a terminal.");
+        };
+        t.borrow().clone()
+    }
 }
 
 impl<F: Function, T: Tag> DotStyle<T> for MTBDDFunction<F> {}

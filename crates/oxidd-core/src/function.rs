@@ -1663,6 +1663,19 @@ pub trait PseudoBooleanFunction: Function {
         edge: &EdgeOfFunc<'id, Self>,
         args: impl IntoIterator<Item = (VarNo, bool)>,
     ) -> Self::Number;
+
+
+    /// Weighted model counting
+    fn wmc(&self, weight: &Self) -> Self::Number {
+        self.with_manager_shared(|manager, lhs| Self::wmc_edge(manager, lhs, weight.as_edge(manager)))
+    }
+
+    /// `Edge` version of [`Self::wmc()`]
+    fn wmc_edge<'id>(
+        manager: &Self::Manager<'id>,
+        edge: &EdgeOfFunc<'id, Self>,
+        weight: &EdgeOfFunc<'id, Self>
+    ) -> Self::Number;
 }
 
 /// Function of three valued logic

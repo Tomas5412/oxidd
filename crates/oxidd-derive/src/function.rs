@@ -793,6 +793,23 @@ pub fn derive_pseudo_boolean_function(input: syn::DeriveInput) -> TokenStream {
                 ) -> Self::Number {
                     <#inner as #trait_path>::eval_edge(manager, edge, args)
                 }
+
+                #[inline]
+                fn wmc(
+                    &self,
+                    weight: &Self,
+                ) -> Self::Number {
+                    <#inner as #trait_path>::wmc(&self.#field, &weight.#field)
+                }
+                #[inline]
+                fn wmc_edge<'__id>(
+                    manager: &#manager_ty,
+                    edge: &#edge_ty,
+                    weight: &#edge_ty,
+                ) -> Self::Number {
+                    <#inner as #trait_path>::wmc_edge(manager, edge, weight)
+                }
+
             }
         },
     )
