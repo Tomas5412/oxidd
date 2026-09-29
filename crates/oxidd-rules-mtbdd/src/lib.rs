@@ -95,8 +95,6 @@ pub enum MTBDDOp {
     /// Project a set of variables
     Project,
 
-    /// Weighted model counting
-    Wmc,
 }
 
 /// Collect the two children of a binary node

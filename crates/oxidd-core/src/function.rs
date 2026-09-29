@@ -1449,7 +1449,7 @@ pub trait PseudoBooleanFunction: Function {
     /// For each node in vars, it merges both branches by adding them, 
     /// making it no longer depend on that variable.
     /// 
-    /// Locking behavior: acquires the manager's lock for shared access. //TODO: Does it, really?
+    /// Locking behavior: acquires the manager's lock for shared access.
     ///
     /// Panics if `self` and `vars` don't belong to the same manager.
     fn project(&self, vars: &Self) -> AllocResult<Self> {
@@ -1666,6 +1666,15 @@ pub trait PseudoBooleanFunction: Function {
 
 
     /// Weighted model counting
+    ///
+    /// This is the implementation of the "ADDMC" formula,
+    /// for calculating the weighted model count of a MTBDD.
+    /// `weight` consists of another MTBDD.
+    /// It returns the full projection of the product between `self` and `weight`.
+    ///
+    /// Locking behavior: acquires the manager's lock for shared access.
+    ///
+    /// Panics if self and `weight` does not belong to the same manager.
     fn wmc(&self, weight: &Self) -> Self::Number {
         self.with_manager_shared(|manager, lhs| Self::wmc_edge(manager, lhs, weight.as_edge(manager)))
     }

@@ -335,3 +335,77 @@ fn ite_overwrite_use_case() -> AllocResult<()> {
         Ok(())
     })
 }
+
+#[test]
+fn project_by_true_cube_is_identity() -> AllocResult<()> {
+    let (mref, vars) = setup();
+    mref.with_manager_shared(|manager| {
+        let f = vars[0].add(&vars[1])?;
+        let empty_cube = MTBDDFunction::constant(manager, I64::Num(1))?;
+        assert!(f.project(&empty_cube)? == f);
+        Ok(())
+    })
+}
+
+
+#[test]
+fn project_shrinks_node_count() -> AllocResult<()> {
+    let (mref, vars) = setup();
+    mref.with_manager_shared(|manager| {
+        let one = MTBDDFunction::constant(manager, I64::Num(1))?;
+        let f = vars[0].add(&vars[1])?.add(&vars[2])?;
+        let before = f.node_count();
+
+        let c = cube(&one, &vars, &[(0, true)])?;
+        let projected = f.project(&c)?;
+        assert!(
+            projected.node_count() < before,
+            "expected fewer nodes after projecting x0: before={before}, after={}",
+            projected.node_count()
+        );
+
+        // Projecting all variables must yield a single terminal node.
+        let full = cube(&one, &vars, &[(0, true), (1, false), (2, true)])?;
+        let fully_projected = f.project(&full)?;
+        assert_eq!(fully_projected.node_count(), 1);
+
+
+        // The full projection of 'x0 + x1 + x2' is 12:
+        // when projecting the first var, the results are: 
+        // 1 + (1 + 2) + (1 + 2) + (2 + 3)
+        // the other projections sum those results
+        let expected = MTBDDFunction::constant(manager, I64::Num(12))?;
+        assert!(fully_projected == expected);
+        Ok(())
+    })
+}
+
+#[test]
+fn project_by_itself_is_terminal() -> AllocResult<()> {
+    let (mref, vars) = setup();
+    mref.with_manager_shared(|_manager| {
+        let f = vars[0].add(&vars[1])?.add(&vars[2])?;
+        let fully_projected = f.project(&f)?;
+        assert_eq!(fully_projected.node_count(), 1);
+        Ok(())
+    })
+}
+
+
+#[test]
+fn project_unused_variable_doubles() -> AllocResult<()> {
+    let (mref, vars) = setup();
+    mref.with_manager_shared(|_manager| {
+        let f = vars[0].add(&vars[2])?;
+        let before = f.node_count();
+        let projected = f.project(&vars[1])?;
+        assert_eq!(
+            projected.node_count(), 
+            before,
+            "mismatch in node count: Expected={before} Actual={}",
+            projected.node_count());
+        let double = f.add(&f)?;
+        assert!(projected == double);
+        Ok(())
+    })
+}
