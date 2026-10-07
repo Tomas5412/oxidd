@@ -743,6 +743,7 @@ pub fn derive_pseudo_boolean_function(input: syn::DeriveInput) -> TokenStream {
         "PseudoBooleanFunction",
         &[
             Var("var"),
+            Unary("normalize"),
             Binary("restrict"),
             Binary("project"),
             Binary("add"),
@@ -809,7 +810,6 @@ pub fn derive_pseudo_boolean_function(input: syn::DeriveInput) -> TokenStream {
                 ) -> Self::Number {
                     <#inner as #trait_path>::wmc_edge(manager, edge, weight)
                 }
-
             }
         },
     )

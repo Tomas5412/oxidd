@@ -1560,6 +1560,17 @@ pub trait PseudoBooleanFunction: Function {
         })
     }
 
+    /// Normalize the terminal values
+    ///
+    /// All non-zero terminals will have their value set to one.
+    fn normalize(&self) -> AllocResult<Self> {
+        self.with_manager_shared(|manager, _| {
+            let e = Self::normalize_edge(manager, self.as_edge(manager))?;
+            Ok(Self::from_edge(manager, e))
+        })
+    }
+
+
     /// Edge version of [`Self::constant()`]
     fn constant_edge<'id>(
         manager: &Self::Manager<'id>,
@@ -1629,6 +1640,12 @@ pub trait PseudoBooleanFunction: Function {
         lhs: &EdgeOfFunc<'id, Self>,
         rhs: &EdgeOfFunc<'id, Self>,
     ) -> AllocResult<EdgeOfFunc<'id, Self>>;
+
+    /// Edge version of [`Self::normalize()`]
+    fn normalize_edge<'id>(
+        manager: &Self::Manager<'id>,
+        root: &EdgeOfFunc<'id, Self>
+    ) -> AllocResult<EdgeOfFunc<'id,Self>>;
 
     /// Edge version of [`Self::ite()`]
     #[must_use]

@@ -95,6 +95,9 @@ pub enum MTBDDOp {
     /// Project a set of variables
     Project,
 
+    /// Cap all non-zero values to one
+    Normalize
+
 }
 
 /// Collect the two children of a binary node

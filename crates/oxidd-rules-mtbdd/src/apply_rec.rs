@@ -327,6 +327,50 @@ where
 }
 
 
+fn normalize<M, T>(
+    manager: &M,
+    f: Borrowed<M::Edge>,
+) -> AllocResult<M::Edge>
+where
+    M: Manager<Terminal = T> + HasApplyCache<M, MTBDDOp>,
+    M::InnerNode: HasLevel,
+    T: NumberBase,
+{
+    match manager.get_node(&f) {
+        Node::Terminal(t) => {
+
+            let v = t.borrow();
+            let term = if v.is_zero() { 
+                T::zero() 
+            } else { 
+                T::one() 
+            };
+
+            manager.get_terminal(term)
+        }
+        Node::Inner(node) => {
+
+            if let Some(res) = manager
+                .apply_cache()
+                .get(manager, MTBDDOp::Normalize, &[f.borrowed()])
+            {
+                return Ok(res);
+            }
+
+            let level = node.level();
+            let (ft, fe) = collect_children(node);
+            let t = EdgeDropGuard::new(manager, normalize::<_, T>(manager, ft)?);
+            let e = EdgeDropGuard::new(manager, normalize::<_, T>(manager, fe)?);
+            let res = reduce(manager, level, t.into_edge(), e.into_edge(), MTBDDOp::Normalize)?;
+
+            manager
+                .apply_cache()
+                .add(manager, MTBDDOp::Normalize, &[f.borrowed()], res.borrowed());
+            Ok(res)
+        }
+    }
+}
+
 /// Recursively apply the if-then-else operator (`if f { g } else { h }`)
 ///
 /// `f` must be a 0-1-valued MTBDD (see [`PseudoBooleanFunction::ite_edge`]).
@@ -543,6 +587,15 @@ where
     }
 
     #[inline]
+    fn normalize_edge<'id>(
+        manager: &Self::Manager<'id>,
+        root: &EdgeOfFunc<'id, Self>,
+    ) -> AllocResult<EdgeOfFunc<'id, Self>> {
+        normalize::<_, T>(manager, root.borrowed())
+    }
+
+
+    #[inline]
     fn ite_edge<'id>(
         manager: &Self::Manager<'id>,
         if_edge: &EdgeOfFunc<'id, Self>,
@@ -588,6 +641,7 @@ where
         inner(manager, edge.borrowed(), &choices)
     }
 
+    #[inline]
     fn wmc_edge<'id>(
         manager: &Self::Manager<'id>,
         edge: &EdgeOfFunc<'id, Self>,
