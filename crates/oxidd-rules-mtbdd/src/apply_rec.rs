@@ -647,9 +647,26 @@ where
         edge: &EdgeOfFunc<'id, Self>,
         weight: &EdgeOfFunc<'id, Self>
     ) -> T {
+
+        fn full_cube<M, T>(manager: &M) -> AllocResult<M::Edge>
+        where
+            M: Manager<Terminal = T> + HasApplyCache<M, MTBDDOp>,
+            M::InnerNode: HasLevel,
+            T: NumberBase,
+        {
+            let zero = EdgeDropGuard::new(manager, manager.get_terminal(T::zero())?);
+            let mut cube = manager.get_terminal(T::one())?;
+            for level in (0..manager.num_vars()).rev() {
+                // then-child continues the cube, else-child is the 0 terminal
+                cube = reduce(manager, level, cube, manager.clone_edge(&zero), MTBDDOp::Project)?;
+            }
+            Ok(cube)
+        }
+
         let prod = apply_bin::<_, T, {MTBDDOp::Mul as u8}>(manager, edge.borrowed(), weight.borrowed()).expect("Out of memory");
         let prod = EdgeDropGuard::new(manager,prod);
 
+        let cube = EdgeDropGuard::new(manager, full_cube::<_, T>(manager).expect("Out of memory"));
         let proj = project::<_,T>(manager, prod.borrowed(), prod.borrowed()).expect("Out of memory");
         let proj = EdgeDropGuard::new(manager,proj);
 
